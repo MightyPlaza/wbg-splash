@@ -91,8 +91,16 @@ render(struct output *output)
     double sx = (double)img_width / (width * scale);
     double sy = (double)img_height / (height * scale);
 
+    float s = sx > sy ? sy : sx;
+    sx = s;
+    sy = s;
+
+    float tx = (img_width / sx - width) / 2 / sx;
+    float ty = (img_height / sy - height) / 2 / sy;
+
     pixman_f_transform_t t;
     pixman_transform_t t2;
+    pixman_f_transform_init_translate(&t, tx, ty);
     pixman_f_transform_init_scale(&t, sx, sy);
     pixman_transform_from_pixman_f_transform(&t2, &t);
     pixman_image_set_transform(pix, &t2);
