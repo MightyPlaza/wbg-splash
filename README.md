@@ -21,9 +21,13 @@ wallpaper _may_ be added in the future.
 * libpng (optional)
 * libjpeg (optional)
 * libwebp (optional)
+* libjxl (optional)
+* libjxl_threads (optional)
 
-Note that if SVG support is disabled at least one of _libpng_, _libjpeg_ and
-_libwebp_ is required.
+Note that if SVG support is disabled at least one of _libpng_, _libjpeg_,
+_libwebp_ and _libjxl_ is required.
+
+_libjxl\_threads_ is recommended for better performance decoding JPEG XL images
 
 
 ### Compile time
@@ -41,10 +45,10 @@ ninja -C build
 sudo ninja -C build install
 ```
 
-By default, PNG, JPEG and WebP support is auto-detected. You can force
+By default, PNG, JPEG, JPEG XL and WebP support is auto-detected. You can force
 disable/enable them with the meson command line options
 `-Dpng=disabled|enabled`, `-Djpeg=disabled|enabled` and
-`-Dwebp=disabled|enabled`.
+`-Dwebp=disabled|enabled` `-Djxl=disabled|enabled`.
 SVG support is enabled by default (as it does not require additional
 dependencies). You can disable it with the meson command line option
 `-Dsvg=false`

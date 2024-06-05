@@ -9,6 +9,7 @@
 ### Added
 
 * Nanosvg updated to 93ce879dc4c04a3ef1758428ec80083c38610b1f
+* JPEG XL support ([#14][14])
 
 
 ### Changed
@@ -20,10 +21,13 @@
 * Compilation error on musl libc ([#11][11]).
 
 [11]: https://codeberg.org/dnkl/wbg/issues/11
+[14]: https://codeberg.org/dnkl/wbg/pulls/14
 
 
 ### Security
 ### Contributors
+
+* Leonardo Hernández Hernández
 
 
 ## 1.2.0
