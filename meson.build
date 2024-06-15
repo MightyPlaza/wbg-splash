@@ -12,7 +12,7 @@ is_debug_build = get_option('buildtype').startswith('debug')
 is_freebsd = host_machine.system() == 'freebsd'
 
 add_project_arguments(
-  (is_freebsd ? [] : ['-D_POSIX_C_SOURCE=200809L', '-D_GNU_SOURCE'] ),
+  (is_freebsd ? ['-D_GNU_SOURCE'] : ['-D_POSIX_C_SOURCE=200809L', '-D_GNU_SOURCE'] ),
   (is_debug_build ? ['-D_DEBUG'] : []),
   language: 'c',
 )
@@ -61,9 +61,7 @@ svg = declare_dependency(
   dependencies: math,
 )
 have_svg = get_option('svg')
-if is_freebsd
-  epoll_shim = dependency('epoll-shim')
-endif
+libepoll = dependency('epoll-shim', required: false)
 
 if not png.found() and not jpg.found() and not jxl.found() and not webp.found() and not have_svg
   error('you must enable at least one image format')
@@ -88,11 +86,6 @@ if jxl.found()
   endif
 else
   jxl_threads = dependency('', required: false)
-endif
-if is_freebsd
-  add_project_arguments('-D__freebsd__=1', language: 'c')
-else
-  add_project_arguments('-D__linux__=1', language: 'c')
 endif
 
 wayland_protocols = dependency('wayland-protocols')
@@ -150,12 +143,6 @@ if have_svg
   image_format_sources += ['svg.c', 'svg.h']
 endif
 
-if is_freebsd
-  dependencies = [pixman, png, jpg, jxl, jxl_threads, webp, svg, wayland_client, tllist, epoll_shim]
-else
-  dependencies = [pixman, png, jpg, jxl, jxl_threads, webp, svg, wayland_client, tllist]
-endif
-
 executable(
     'wbg',
     'main.c',
@@ -164,7 +151,7 @@ executable(
     'stride.h',
     image_format_sources,
     wl_proto_src + wl_proto_headers, version,
-    dependencies: dependencies,
+    dependencies: [pixman, png, jpg, jxl, jxl_threads, webp, svg, wayland_client, tllist, libepoll],
     install: true)
 
 summary(
