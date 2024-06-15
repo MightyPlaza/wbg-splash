@@ -9,15 +9,18 @@ project('wbg', 'c',
             'b_ndebug=if-release'])
 
 is_debug_build = get_option('buildtype').startswith('debug')
-is_freebsd = host_machine.system() == 'freebsd'
 
 add_project_arguments(
-  (is_freebsd ? ['-D_GNU_SOURCE'] : ['-D_POSIX_C_SOURCE=200809L', '-D_GNU_SOURCE'] ),
+  ['-D_GNU_SOURCE=200809L'],
   (is_debug_build ? ['-D_DEBUG'] : []),
   language: 'c',
 )
 
 cc = meson.get_compiler('c')
+
+if cc.has_function('memfd_create')
+  add_project_arguments('-DMEMFD_CREATE', language: 'c')
+endif
 
 # Compute the relative path used by compiler invocations.
 source_root = meson.current_source_dir().split('/')

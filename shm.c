@@ -66,7 +66,7 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie)
     pixman_image_t *pix = NULL;
 
     /* Backing memory for SHM */
-
+#if defined(MEMFD_CREATE)
     /*
      * Older kernels reject MFD_NOEXEC_SEAL with EINVAL. Try first
      * *with* it, and if that fails, try again *without* it.
@@ -80,7 +80,14 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie)
         pool_fd = memfd_create(
             "wbg-wayland-shm-buffer-pool", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     }
-
+#elif defined(__FreeBSD__)
+    // memfd_create on FreeBSD 13 is SHM_ANON without sealing support
+    pool_fd = shm_open(SHM_ANON, O_RDWR | O_CLOEXEC, 0600);
+#else
+    char name[] = "/tmp/foot-wayland-shm-buffer-pool-XXXXXX";
+    pool_fd = mkostemp(name, O_CLOEXEC);
+    unlink(name);
+#endif
     if (pool_fd == -1) {
         LOG_ERRNO("failed to create SHM backing memory file");
         goto err;
