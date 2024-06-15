@@ -7,7 +7,10 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <linux/memfd.h>
+
+#ifdef __linux__
+ #include <linux/memfd.h>
+#endif
 
 #include <tllist.h>
 
