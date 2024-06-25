@@ -78,8 +78,10 @@ render(struct output *output)
     const int width = output->render_width;
     const int height = output->render_height;
     const int scale = output->scale;
+
     struct buffer *buf = shm_get_buffer(
         shm, width * scale, height * scale, (uintptr_t)(void *)output);
+
     if (buf == NULL)
         return;
 
