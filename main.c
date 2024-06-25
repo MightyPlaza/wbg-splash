@@ -78,50 +78,25 @@ render(struct output *output)
     const int width = output->render_width;
     const int height = output->render_height;
     const int scale = output->scale;
-
     struct buffer *buf = shm_get_buffer(
         shm, width * scale, height * scale, (uintptr_t)(void *)output);
-
     if (buf == NULL)
         return;
 
-    uint32_t *data = pixman_image_get_data(image);
-    int img_width = pixman_image_get_width(image);
-    int img_height = pixman_image_get_height(image);
-    int img_stride = pixman_image_get_stride(image);
-    pixman_format_code_t img_fmt = pixman_image_get_format(image);
+    double s = fmin((double)(width * scale) / pixman_image_get_width(image),
+                    (double)(height * scale) / pixman_image_get_height(image));
 
-    pixman_image_t *pix = pixman_image_create_bits_no_clear(
-        img_fmt, img_width, img_height, data, img_stride);
+    pixman_transform_t t;
+    pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
+    pixman_transform_translate(&t, NULL,
+        pixman_double_to_fixed((pixman_image_get_width(image) - width * scale / s) / 2),
+        pixman_double_to_fixed((pixman_image_get_height(image) - height * scale / s) / 2));
 
-    double sx = (double)img_width / (width * scale);
-    double sy = (double)img_height / (height * scale);
+    pixman_image_set_transform(image, &t);
+    pixman_image_set_filter(image, PIXMAN_FILTER_BEST, NULL, 0);
 
-    float s = sx > sy ? sy : sx;
-    sx = s;
-    sy = s;
-
-    float tx = (img_width / sx - width) / 2 / sx;
-    float ty = (img_height / sy - height) / 2 / sy;
-
-    pixman_f_transform_t t;
-    pixman_transform_t t2;
-    pixman_f_transform_init_translate(&t, tx, ty);
-    pixman_f_transform_init_scale(&t, sx, sy);
-    pixman_transform_from_pixman_f_transform(&t2, &t);
-    pixman_image_set_transform(pix, &t2);
-    pixman_image_set_filter(pix, PIXMAN_FILTER_BEST, NULL, 0);
-
-    pixman_image_composite32(
-        PIXMAN_OP_SRC,
-        pix, NULL, buf->pix, 0, 0, 0, 0, 0, 0,
-        width * scale, height * scale);
-
-    pixman_image_unref(pix);
-
-    LOG_INFO("render: %dx%d (scaled from %dx%d)",
-             width * scale, height * scale,
-             img_width, img_height);
+    pixman_image_composite32(PIXMAN_OP_SRC, image, NULL, buf->pix,
+        0, 0, 0, 0, 0, 0, width * scale, height * scale);
 
     wl_surface_set_buffer_scale(output->surf, scale);
     wl_surface_attach(output->surf, buf->wl_buf, 0, 0);
