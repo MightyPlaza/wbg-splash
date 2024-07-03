@@ -72,6 +72,8 @@ struct output {
 };
 static tll(struct output) outputs;
 
+static bool stretch = false;
+
 static void
 render(struct output *output)
 {
@@ -85,8 +87,8 @@ render(struct output *output)
     if (buf == NULL)
         return;
 
-    double s = fmin((double)(width * scale) / pixman_image_get_width(image),
-                    (double)(height * scale) / pixman_image_get_height(image));
+    double s = (stretch ? fmax : fmin)((double)(width * scale) / pixman_image_get_width(image),
+                                       (double)(height * scale) / pixman_image_get_height(image));
 
     pixman_transform_t t;
     pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
@@ -364,17 +366,19 @@ static const struct wl_registry_listener registry_listener = {
 int
 main(int argc, const char *const *argv)
 {
-    if (argc < 2) {
-        fprintf(stderr, "error: missing required argument: image path\n");
+    if (argc < 2 || (argc > 3) || (argc == 3 && strcmp(argv[1], "-s") != 0)) {
+        fprintf(stderr, "Usage: %s [-s] <image_path>\n", argv[0]);
         return EXIT_FAILURE;
     }
+
+    const char *image_path = argv[argc - 1];
+    stretch = (argc == 3);
 
     setlocale(LC_CTYPE, "");
     log_init(LOG_COLORIZE_AUTO, false, LOG_FACILITY_DAEMON, LOG_CLASS_WARNING);
 
     LOG_INFO("%s", WBG_VERSION);
 
-    const char *image_path = argv[1];
     image = NULL;
 
     FILE *fp = fopen(image_path, "rb");
