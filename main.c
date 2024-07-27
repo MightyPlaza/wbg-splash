@@ -78,6 +78,7 @@ render(struct output *output)
     const int width = output->render_width;
     const int height = output->render_height;
     const int scale = output->scale;
+    pixman_image_t *pix;
 
     struct buffer *buf = shm_get_buffer(
         shm, width * scale, height * scale, (uintptr_t)(void *)output);
@@ -85,43 +86,57 @@ render(struct output *output)
     if (buf == NULL)
         return;
 
-    uint32_t *data = pixman_image_get_data(image);
-    int img_width = pixman_image_get_width(image);
-    int img_height = pixman_image_get_height(image);
-    int img_stride = pixman_image_get_stride(image);
-    pixman_format_code_t img_fmt = pixman_image_get_format(image);
+#if defined(WBG_HAVE_SVG)
+    if (image == NULL) {
+        pix = svg_render(width * scale, height * scale);
+        LOG_INFO("render: %dx%d", width * scale, height * scale);
+    } else
+#endif
+    {
 
-    pixman_image_t *pix = pixman_image_create_bits_no_clear(
-        img_fmt, img_width, img_height, data, img_stride);
+        uint32_t *data = pixman_image_get_data(image);
+        int img_width = pixman_image_get_width(image);
+        int img_height = pixman_image_get_height(image);
+        int img_stride = pixman_image_get_stride(image);
+        pixman_format_code_t img_fmt = pixman_image_get_format(image);
 
-    double sx = (double)img_width / (width * scale);
-    double sy = (double)img_height / (height * scale);
+        pix = pixman_image_create_bits_no_clear(
+            img_fmt, img_width, img_height, data, img_stride);
 
-    float s = sx > sy ? sy : sx;
-    sx = s;
-    sy = s;
+        double sx = (double)img_width / (width * scale);
+        double sy = (double)img_height / (height * scale);
 
-    float tx = (img_width / sx - width) / 2 / sx;
-    float ty = (img_height / sy - height) / 2 / sy;
+        float s = sx > sy ? sy : sx;
+        sx = s;
+        sy = s;
 
-    pixman_f_transform_t t;
-    pixman_transform_t t2;
-    pixman_f_transform_init_translate(&t, tx, ty);
-    pixman_f_transform_init_scale(&t, sx, sy);
-    pixman_transform_from_pixman_f_transform(&t2, &t);
-    pixman_image_set_transform(pix, &t2);
-    pixman_image_set_filter(pix, PIXMAN_FILTER_BEST, NULL, 0);
+        float tx = (img_width / sx - width) / 2 / sx;
+        float ty = (img_height / sy - height) / 2 / sy;
+
+        pixman_f_transform_t t;
+        pixman_transform_t t2;
+        pixman_f_transform_init_translate(&t, tx, ty);
+        pixman_f_transform_init_scale(&t, sx, sy);
+        pixman_transform_from_pixman_f_transform(&t2, &t);
+        pixman_image_set_transform(pix, &t2);
+        pixman_image_set_filter(pix, PIXMAN_FILTER_BEST, NULL, 0);
+
+        LOG_INFO("render: %dx%d (scaled from %dx%d)",
+                 width * scale, height * scale,
+                 img_width, img_height);
+    }
 
     pixman_image_composite32(
         PIXMAN_OP_SRC,
         pix, NULL, buf->pix, 0, 0, 0, 0, 0, 0,
         width * scale, height * scale);
 
-    pixman_image_unref(pix);
 
-    LOG_INFO("render: %dx%d (scaled from %dx%d)",
-             width * scale, height * scale,
-             img_width, img_height);
+#if defined(WBG_HAVE_SVG)
+    if (image == NULL)
+        free(pixman_image_get_data(pix));
+#endif
+    pixman_image_unref(pix);
 
     wl_surface_set_buffer_scale(output->surf, scale);
     wl_surface_attach(output->surf, buf->wl_buf, 0, 0);
@@ -243,6 +258,7 @@ output_scale(void *data, struct wl_output *wl_output, int32_t factor)
 {
     struct output *output = data;
     output->scale = factor;
+
     if (output->configured)
         render(output);
 }
@@ -418,15 +434,15 @@ main(int argc, const char *const *argv)
     if (image == NULL)
         image = webp_load(fp, image_path);
 #endif
-#if defined(WBG_HAVE_SVG)
-    if (image == NULL)
-        image = svg_load(fp, image_path);
-#endif
 #if defined(WBG_HAVE_JXL)
     if (image == NULL)
         image = jxl_load(fp, image_path);
 #endif
-    if (image == NULL) {
+    if (image == NULL
+#if defined(WBG_HAVE_SVG)
+        && !svg_load(fp, image_path)
+#endif
+    ) {
         LOG_ERR("%s: failed to load", image_path);
         fclose(fp);
         return EXIT_FAILURE;
@@ -560,6 +576,9 @@ out:
         free(pixman_image_get_data(image));
         pixman_image_unref(image);
     }
+#if defined(WBG_HAVE_SVG)
+    svg_free();
+#endif
     log_deinit();
     fclose(fp);
     return exit_code;
