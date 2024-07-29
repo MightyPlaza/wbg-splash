@@ -4,7 +4,6 @@
 * [1.2.0](#1-2-)
 * [1.1.0](#1-1-0)
 
-
 ## Unreleased
 ### Added
 
@@ -20,10 +19,28 @@
 
 [14]: https://codeberg.org/dnkl/wbg/pulls/14
 
+* Flags added to stretch wallpapers: `[-s|--stretch]`
+
+[18]: https://codeberg.org/dnkl/wbg/pulls/18
 
 ### Changed
+
+* "Centered maximized" is the default method now.
+* Simplify the rendering logic to use a single transformation.
+* Unify the handling of SVG and other image types.
+* Improve error handling and usage instructions.
+* Update scaling algorithm to support both stretched & centered.
+* Directly use the source image without an intermediate pixman image.
+
+[18]: https://codeberg.org/dnkl/wbg/pulls/18
+
 ### Deprecated
 ### Removed
+
+* Remove some redundant variable declarations and calculations.
+
+[18]: https://codeberg.org/dnkl/wbg/pulls/18
+
 ### Fixed
 
 * Alpha not being applied correctly to PNG images.
@@ -31,6 +48,9 @@
 
 [11]: https://codeberg.org/dnkl/wbg/issues/11
 
+* Free the memory in SVG rendering.
+
+[18]: https://codeberg.org/dnkl/wbg/pulls/18
 
 ### Security
 ### Contributors

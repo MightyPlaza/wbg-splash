@@ -72,71 +72,38 @@ struct output {
 };
 static tll(struct output) outputs;
 
-static void
-render(struct output *output)
+static bool stretch = false;
+
+static void render(struct output *output)
 {
-    const int width = output->render_width;
-    const int height = output->render_height;
-    const int scale = output->scale;
-    pixman_image_t *pix;
+    int width = output->render_width, height = output->render_height, scale = output->scale;
+    struct buffer *buf = shm_get_buffer(shm, width * scale, height * scale, (uintptr_t)output);
+    if (!buf) return;
 
-    struct buffer *buf = shm_get_buffer(
-        shm, width * scale, height * scale, (uintptr_t)(void *)output);
+    pixman_image_t *src = image ?: 
+#if defined(WBG_HAVE_SVG)
+        svg_render(width * scale, height * scale);
+#else
+        NULL;
+#endif
 
-    if (buf == NULL)
-        return;
+    double sx = (double)(width * scale) / pixman_image_get_width(src);
+    double sy = (double)(height * scale) / pixman_image_get_height(src);
+    double s = stretch ? fmax(sx, sy) : fmin(sx, sy);
+
+    pixman_transform_t t;
+    pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
+    pixman_transform_translate(&t, NULL,
+        pixman_double_to_fixed((pixman_image_get_width(src) - width * scale / s) / 2),
+        pixman_double_to_fixed((pixman_image_get_height(src) - height * scale / s) / 2));
+
+    pixman_image_set_transform(src, &t);
+    pixman_image_set_filter(src, PIXMAN_FILTER_BEST, NULL, 0);
+    pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix, 0, 0, 0, 0, 0, 0, width * scale, height * scale);
 
 #if defined(WBG_HAVE_SVG)
-    if (image == NULL) {
-        pix = svg_render(width * scale, height * scale);
-        LOG_INFO("render: %dx%d", width * scale, height * scale);
-    } else
+    if (!image) free(pixman_image_get_data(src));
 #endif
-    {
-
-        uint32_t *data = pixman_image_get_data(image);
-        int img_width = pixman_image_get_width(image);
-        int img_height = pixman_image_get_height(image);
-        int img_stride = pixman_image_get_stride(image);
-        pixman_format_code_t img_fmt = pixman_image_get_format(image);
-
-        pix = pixman_image_create_bits_no_clear(
-            img_fmt, img_width, img_height, data, img_stride);
-
-        double sx = (double)img_width / (width * scale);
-        double sy = (double)img_height / (height * scale);
-
-        float s = sx > sy ? sy : sx;
-        sx = s;
-        sy = s;
-
-        float tx = (img_width / sx - width) / 2 / sx;
-        float ty = (img_height / sy - height) / 2 / sy;
-
-        pixman_f_transform_t t;
-        pixman_transform_t t2;
-        pixman_f_transform_init_translate(&t, tx, ty);
-        pixman_f_transform_init_scale(&t, sx, sy);
-        pixman_transform_from_pixman_f_transform(&t2, &t);
-        pixman_image_set_transform(pix, &t2);
-        pixman_image_set_filter(pix, PIXMAN_FILTER_BEST, NULL, 0);
-
-        LOG_INFO("render: %dx%d (scaled from %dx%d)",
-                 width * scale, height * scale,
-                 img_width, img_height);
-    }
-
-    pixman_image_composite32(
-        PIXMAN_OP_SRC,
-        pix, NULL, buf->pix, 0, 0, 0, 0, 0, 0,
-        width * scale, height * scale);
-
-
-#if defined(WBG_HAVE_SVG)
-    if (image == NULL)
-        free(pixman_image_get_data(pix));
-#endif
-    pixman_image_unref(pix);
 
     wl_surface_set_buffer_scale(output->surf, scale);
     wl_surface_attach(output->surf, buf->wl_buf, 0, 0);
@@ -403,22 +370,24 @@ static const struct wl_registry_listener registry_listener = {
 int
 main(int argc, const char *const *argv)
 {
-    if (argc < 2) {
-        fprintf(stderr, "error: missing required argument: image path\n");
+    if (argc != 2 && (argc != 3 || (strcmp(argv[1], "-s") != 0 && strcmp(argv[1], "--stretch") != 0))) {
+        fprintf(stderr, "Usage: %s [-s|--stretch] <image_path>\n", argv[0]);
         return EXIT_FAILURE;
     }
+    const char *image_path = argv[argc - 1];
+    stretch = (argc == 3);
 
     setlocale(LC_CTYPE, "");
     log_init(LOG_COLORIZE_AUTO, false, LOG_FACILITY_DAEMON, LOG_CLASS_WARNING);
 
     LOG_INFO("%s", WBG_VERSION);
 
-    const char *image_path = argv[1];
     image = NULL;
 
     FILE *fp = fopen(image_path, "rb");
     if (fp == NULL) {
         LOG_ERRNO("%s: failed to open", image_path);
+	fprintf(stderr, "\nUsage: %s [-s|--stretch] <image_path>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
