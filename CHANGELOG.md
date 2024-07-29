@@ -21,7 +21,7 @@
 
 * Flags added to stretch wallpapers: `[-s|--stretch]`
 
-[18]: https://codeberg.org/dnkl/wbg/pulls/18
+[18]: https://codeberg.org/dnkl/wbg/pulls/21
 
 ### Changed
 
@@ -32,14 +32,14 @@
 * Update scaling algorithm to support both stretched & centered.
 * Directly use the source image without an intermediate pixman image.
 
-[18]: https://codeberg.org/dnkl/wbg/pulls/18
+[18]: https://codeberg.org/dnkl/wbg/pulls/21
 
 ### Deprecated
 ### Removed
 
 * Remove some redundant variable declarations and calculations.
 
-[18]: https://codeberg.org/dnkl/wbg/pulls/18
+[18]: https://codeberg.org/dnkl/wbg/pulls/21
 
 ### Fixed
 
@@ -50,7 +50,7 @@
 
 * Free the memory in SVG rendering.
 
-[18]: https://codeberg.org/dnkl/wbg/pulls/18
+[18]: https://codeberg.org/dnkl/wbg/pulls/21
 
 ### Security
 ### Contributors
