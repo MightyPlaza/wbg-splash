@@ -28,7 +28,6 @@
 
 * "Centered maximized" is the default method now.
 * Simplify the rendering logic to use a single transformation.
-* Unify the handling of SVG and other image types.
 * Improve error handling and usage instructions.
 * Update scaling algorithm to support both stretched & centered.
 * Directly use the source image without an intermediate pixman image.
