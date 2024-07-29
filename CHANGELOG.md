@@ -23,6 +23,7 @@
 
 [21]: https://codeberg.org/dnkl/wbg/pulls/21
 
+
 ### Changed
 
 * "Centered maximized" is the default method now.
@@ -34,12 +35,14 @@
 
 [21]: https://codeberg.org/dnkl/wbg/pulls/21
 
+
 ### Deprecated
 ### Removed
 
 * Remove some redundant variable declarations and calculations.
 
 [21]: https://codeberg.org/dnkl/wbg/pulls/21
+
 
 ### Fixed
 
