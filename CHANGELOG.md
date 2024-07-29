@@ -48,10 +48,6 @@
 
 [11]: https://codeberg.org/dnkl/wbg/issues/11
 
-* Free the memory in SVG rendering.
-
-[18]: https://codeberg.org/dnkl/wbg/pulls/21
-
 ### Security
 ### Contributors
 
