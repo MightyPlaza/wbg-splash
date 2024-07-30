@@ -93,28 +93,26 @@ static void render(struct output *output)
     }
 #endif
 
-    if (src) {
-        if (!is_svg) {
-            double sx = (double)(width * scale) / pixman_image_get_width(src);
-            double sy = (double)(height * scale) / pixman_image_get_height(src);
-            double s = stretch ? fmax(sx, sy) : fmin(sx, sy);
+    if (!is_svg) {
+        double sx = (double)(width * scale) / pixman_image_get_width(src);
+        double sy = (double)(height * scale) / pixman_image_get_height(src);
+        double s = stretch ? fmax(sx, sy) : fmin(sx, sy);
 
-            pixman_transform_t t;
-            pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
-            pixman_transform_translate(&t, NULL,
-                pixman_double_to_fixed((pixman_image_get_width(src) - width * scale / s) / 2),
-                pixman_double_to_fixed((pixman_image_get_height(src) - height * scale / s) / 2));
+        pixman_transform_t t;
+        pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
+        pixman_transform_translate(&t, NULL,
+            pixman_double_to_fixed((pixman_image_get_width(src) - width * scale / s) / 2),
+            pixman_double_to_fixed((pixman_image_get_height(src) - height * scale / s) / 2));
 
-            pixman_image_set_transform(src, &t);
-            pixman_image_set_filter(src, PIXMAN_FILTER_BEST, NULL, 0);
-        }
+        pixman_image_set_transform(src, &t);
+        pixman_image_set_filter(src, PIXMAN_FILTER_BEST, NULL, 0);
+    }
 
-        pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix, 
-                                 0, 0, 0, 0, 0, 0, width * scale, height * scale);
+    pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix, 
+                             0, 0, 0, 0, 0, 0, width * scale, height * scale);
 
-        if (is_svg) {
-            pixman_image_unref(src);
-        }
+    if (is_svg) {
+        pixman_image_unref(src);
     }
 
     wl_surface_set_buffer_scale(output->surf, scale);
