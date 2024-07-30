@@ -83,44 +83,39 @@ static void render(struct output *output)
     struct buffer *buf = shm_get_buffer(shm, width * scale, height * scale, (uintptr_t)output);
     if (!buf) return;
 
-    pixman_image_t *src;
+    pixman_image_t *src = image;
     bool is_svg = false;
 
-    if (image) {
-        src = image;
-    } else {
 #if defined(WBG_HAVE_SVG)
+    if (!src) {
         src = svg_render(width, height);
         is_svg = true;
-#else
-        src = NULL;
+    }
 #endif
-    }
-
-    if (src && !is_svg) {
-        double sx = (double)(width * scale) / pixman_image_get_width(src);
-        double sy = (double)(height * scale) / pixman_image_get_height(src);
-        double s = stretch ? fmax(sx, sy) : fmin(sx, sy);
-
-        pixman_transform_t t;
-        pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
-        pixman_transform_translate(&t, NULL,
-            pixman_double_to_fixed((pixman_image_get_width(src) - width * scale / s) / 2),
-            pixman_double_to_fixed((pixman_image_get_height(src) - height * scale / s) / 2));
-
-        pixman_image_set_transform(src, &t);
-        pixman_image_set_filter(src, PIXMAN_FILTER_BEST, NULL, 0);
-    }
 
     if (src) {
-        pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix, 0, 0, 0, 0, 0, 0, width * scale, height * scale);
-    }
+        if (!is_svg) {
+            double sx = (double)(width * scale) / pixman_image_get_width(src);
+            double sy = (double)(height * scale) / pixman_image_get_height(src);
+            double s = stretch ? fmax(sx, sy) : fmin(sx, sy);
 
-#if defined(WBG_HAVE_SVG)
-    if (src && is_svg) {
-        pixman_image_unref(src);
+            pixman_transform_t t;
+            pixman_transform_init_scale(&t, pixman_double_to_fixed(1/s), pixman_double_to_fixed(1/s));
+            pixman_transform_translate(&t, NULL,
+                pixman_double_to_fixed((pixman_image_get_width(src) - width * scale / s) / 2),
+                pixman_double_to_fixed((pixman_image_get_height(src) - height * scale / s) / 2));
+
+            pixman_image_set_transform(src, &t);
+            pixman_image_set_filter(src, PIXMAN_FILTER_BEST, NULL, 0);
+        }
+
+        pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix, 
+                                 0, 0, 0, 0, 0, 0, width * scale, height * scale);
+
+        if (is_svg) {
+            pixman_image_unref(src);
+        }
     }
-#endif
 
     wl_surface_set_buffer_scale(output->surf, scale);
     wl_surface_attach(output->surf, buf->wl_buf, 0, 0);
