@@ -74,13 +74,16 @@ static tll(struct output) outputs;
 
 static bool stretch = false;
 
-static void render(struct output *output)
+static void
+render(struct output *output)
 {
     const int width = output->render_width;
     const int height = output->render_height;
     const int scale = output->scale;
 
-    struct buffer *buf = shm_get_buffer(shm, width * scale, height * scale, (uintptr_t)output);
+    struct buffer *buf = shm_get_buffer(
+        shm, width * scale, height * scale, (uintptr_t)output);
+    
     if (!buf) return;
 
     pixman_image_t *src = image;
@@ -395,11 +398,11 @@ main(int argc, const char *const *argv)
     image = NULL;
 
     FILE *fp = fopen(image_path, "rb");
-    if (fp == NULL) {
-        LOG_ERRNO("%s: failed to open", image_path);
-	fprintf(stderr, "\nUsage: %s [-s|--stretch] <image_path>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
+if (fp == NULL) {
+    LOG_ERRNO("%s: failed to open", image_path);
+    fprintf(stderr, "\nUsage: %s [-s|--stretch] <image_path>\n", argv[0]);
+    return EXIT_FAILURE;
+}
 
 #if defined(WBG_HAVE_JPG)
     if (image == NULL)
