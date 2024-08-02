@@ -27,20 +27,12 @@
 ### Changed
 
 * "Centered maximized" is the default method now.
-* Simplify the rendering logic to use a single transformation.
-* Improve error handling and usage instructions.
-* Update scaling algorithm to support both stretched & centered.
-* Directly use the source image without an intermediate pixman image.
 
 [21]: https://codeberg.org/dnkl/wbg/pulls/21
 
 
 ### Deprecated
 ### Removed
-
-* Remove some redundant variable declarations and calculations.
-
-[21]: https://codeberg.org/dnkl/wbg/pulls/21
 
 
 ### Fixed
