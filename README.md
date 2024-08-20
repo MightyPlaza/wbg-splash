@@ -9,7 +9,7 @@ file. This image is displayed scaled-to-fit on all monitors.
 More display options, and/or the ability to set a per-monitor
 wallpaper _may_ be added in the future.
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/wbg.svg)](https://repology.org/project/wbg/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/wbg.svg?columns=4)](https://repology.org/project/wbg/versions)
 
 
 ## Requirements
