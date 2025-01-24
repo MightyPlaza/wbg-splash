@@ -8,7 +8,7 @@
 ## Unreleased
 ### Added
 
-* Nanosvg updated to 93ce879dc4c04a3ef1758428ec80083c38610b1f
+* Nanosvg updated to ea6a6aca009422bba0dbad4c80df6e6ba0c82183
 * JPEG XL support ([#14][14])
 * Log output now respects the [`NO_COLOR`](http://no-color.org/)
   environment variable.
