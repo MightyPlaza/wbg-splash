@@ -100,6 +100,8 @@ endif
 wayland_protocols = dependency('wayland-protocols')
 wayland_client = dependency('wayland-client')
 tllist = dependency('tllist', version: '>=1.0.1', fallback: 'tllist')
+fcft = dependency('fcft')
+
 
 wayland_protocols_datadir = wayland_protocols.get_variable('pkgdatadir')
 
@@ -161,7 +163,7 @@ executable(
     'wbg-features.h',
     image_format_sources,
     wl_proto_src + wl_proto_headers, version,
-    dependencies: [pixman, png, jpg, jxl, jxl_threads, webp, svg, wayland_client, tllist],
+    dependencies: [fcft, pixman, png, jpg, jxl, jxl_threads, webp, svg, wayland_client, tllist],
     install: true)
 
 summary(

@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <uchar.h>
+#include <ctype.h>
 
 #include <sys/signalfd.h>
 
@@ -18,6 +20,7 @@
 #include <wlr-layer-shell-unstable-v1.h>
 #include <pixman.h>
 #include <tllist.h>
+#include <fcft/fcft.h>
 
 #define LOG_MODULE "wbg"
 #define LOG_ENABLE_DBG 0
@@ -49,6 +52,14 @@ static struct wl_compositor *compositor;
 static struct wl_shm *shm;
 static struct zwlr_layer_shell_v1 *layer_shell;
 
+static char32_t *text;
+static size_t text_len;
+static pixman_color_t fg = {0x5555, 0x5555, 0x5555, 0x5555};
+static float offset = 0.96f;
+
+static struct fcft_font *font = NULL;
+static enum fcft_subpixel subpixel_mode = FCFT_SUBPIXEL_DEFAULT;
+
 static bool have_xrgb8888 = false;
 
 /* TODO: one per output */
@@ -77,6 +88,60 @@ static tll(struct output) outputs;
 static bool stretch = false;
 
 static void
+render_glyphs(struct buffer *buf, int *x, const int *y, pixman_image_t *color,
+              size_t count, const struct fcft_glyph *glyphs[static count],
+              long *kern)
+{
+    for (size_t i = 0; i < count; i++) {
+        const struct fcft_glyph *g = glyphs[i];
+        if (g == NULL)
+            continue;
+
+        if (kern != NULL)
+            *x += kern[i];
+
+        if (pixman_image_get_format(g->pix) == PIXMAN_a8r8g8b8) {
+            pixman_image_composite32(
+                PIXMAN_OP_OVER, g->pix, NULL, buf->pix, 0, 0, 0, 0,
+                *x + g->x, *y + font->ascent - g->y, g->width, g->height);
+        } else {
+            pixman_image_composite32(
+                PIXMAN_OP_OVER, color, g->pix, buf->pix, 0, 0, 0, 0,
+                *x + g->x, *y + font->ascent - g->y, g->width, g->height);
+        }
+
+        *x += g->advance.x;
+    }
+}
+
+static void
+render_chars(const char32_t *text, size_t text_len,
+             struct buffer *buf, int y, pixman_image_t *color)
+{
+    const struct fcft_glyph *glyphs[text_len];
+    long kern[text_len];
+    int text_width = 0;
+
+    for (size_t i = 0; i < text_len; i++) {
+        glyphs[i] = fcft_rasterize_char_utf32(font, text[i], subpixel_mode);
+        if (glyphs[i] == NULL)
+            continue;
+
+        kern[i] = 0;
+        if (i > 0) {
+            long x_kern;
+            if (fcft_kerning(font, text[i - 1], text[i], &x_kern, NULL))
+                kern[i] = x_kern;
+        }
+
+        text_width += kern[i] + glyphs[i]->advance.x;
+    }
+
+    int x = (buf->width - text_width) / 2;
+    render_glyphs(buf, &x, &y, color, text_len, glyphs, kern);
+}
+
+static void
 render(struct output *output)
 {
     const int width = output->render_width;
@@ -90,6 +155,7 @@ render(struct output *output)
         return;
 
     pixman_image_t *src = image;
+
 #if defined(WBG_HAVE_SVG)
     bool is_svg = false;
 #endif
@@ -117,6 +183,10 @@ render(struct output *output)
 
     pixman_image_composite32(PIXMAN_OP_SRC, src, NULL, buf->pix,
                              0, 0, 0, 0, 0, 0, width * scale, height * scale);
+
+    pixman_image_t *clr_pix = pixman_image_create_solid_fill(&fg);
+    int y = offset * (height * scale - font->height);
+    render_chars(text, text_len, buf, y, clr_pix);
 
 #if defined(WBG_HAVE_SVG)
     if (is_svg) {
@@ -393,8 +463,11 @@ usage(const char *progname)
     printf("Usage: %s [OPTIONS] IMAGE_FILE\n"
            "\n"
            "Options:\n"
-           "  -s,--stretch     stretch the image to fill the screen\n"
-           "  -v,--version     show the version number and quit\n"
+           "  -t,--text=TEXT       text string to render\n"
+           "  -f,--font=FONTS      comma separated list of FontConfig formatted font specifications\n"
+           "  -c,--color=RRGGBBAA  text color (e.g. 00ff00ff for non-transparent green)\n"
+           "  -s,--stretch         stretch the image to fill the screen\n"
+           "  -v,--version         show the version number and quit\n"
            , progname);
 }
 
@@ -419,19 +492,69 @@ main(int argc, char *const *argv)
     const char *progname = argv[0];
 
     const struct option longopts[] = {
+        {"text",    required_argument, NULL, 't'},
+        {"font",    required_argument, NULL, 'f'},
+        {"color",   required_argument, NULL, 'c'},
+        {"offset",  required_argument, NULL, 'o'},
         {"stretch", no_argument, 0, 's'},
         {"version", no_argument, 0, 'v'},
         {"help",    no_argument, 0, 'h'},
         {NULL,      no_argument, 0, 0},
     };
 
+    const char *user_text = "";
+    const char *font_list = "Sans:size=14";
+
     while (true) {
-        int c = getopt_long(argc, argv, ":svh", longopts, NULL);
+        int c = getopt_long(argc, argv, ":t:f:c:o:svh", longopts, NULL);
         if (c < 0)
             break;
 
         switch (c) {
+        case 't':
+            user_text = optarg;
+            break;
+
+        case 'f':
+            font_list = optarg;
+            break;
+
+        case 'c': {
+            errno = 0;
+            char *end;
+            unsigned long color = strtoul(optarg, &end, 16);
+
+            assert(*end == '\0');
+            assert(errno == 0);
+
+            uint8_t _alpha = color & 0xff;
+            uint16_t alpha = (uint16_t)_alpha << 8 | _alpha;
+
+            uint32_t r = (color >> 24) & 0xff;
+            uint32_t g = (color >> 16) & 0xff;
+            uint32_t b = (color >> 8) & 0xff;
+
+            fg = (pixman_color_t){
+                .red =   (r << 8 | r) * alpha / 0xffff,
+                .green = (g << 8 | g) * alpha / 0xffff,
+                .blue =  (b << 8 | b) * alpha / 0xffff,
+                .alpha = alpha,
+            };
+            break;
+        }
+
+        case 'o': {
+            errno = 0;
+            offset = atof(optarg);
+
+            assert(*end == '\0');
+            assert(errno == 0);
+
+            break;
+        }
+
         case 's':
+            stretch = true;
             break;
 
         case 'v':
@@ -452,17 +575,77 @@ main(int argc, char *const *argv)
         }
     }
 
-    if (argc != 2 && (argc != 3 || (strcmp(argv[1], "-s") != 0 && strcmp(argv[1], "--stretch") != 0))) {
-        fprintf(stderr, "Usage: %s [-s|--stretch] <image_path>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
     const char *image_path = argv[argc - 1];
-    stretch = (argc == 3);
 
     setlocale(LC_CTYPE, "");
     log_init(LOG_COLORIZE_AUTO, false, LOG_FACILITY_DAEMON, LOG_CLASS_WARNING);
 
     LOG_INFO("%s", WBG_VERSION);
+
+    assert(locale_is_utf8());
+    fcft_init(FCFT_LOG_COLORIZE_AUTO, false, FCFT_LOG_CLASS_DEBUG);
+    atexit(&fcft_fini);
+
+    /* Convert text string to Unicode */
+    text = calloc(strlen(user_text) + 1, sizeof(text[0]));
+    assert(text != NULL);
+
+    {
+        mbstate_t ps = {0};
+        const char *in = user_text;
+        const char *const end = user_text + strlen(user_text) + 1;
+
+        size_t ret;
+
+        while ((ret = mbrtoc32(&text[text_len], in, end - in, &ps)) != 0) {
+            switch (ret) {
+            case (size_t)-1:
+                break;
+
+            case (size_t)-2:
+                break;
+
+            case (size_t)-3:
+                break;
+            }
+
+            in += ret;
+            text_len++;
+        }
+    }
+
+    /* Instantiate font, and fallbacks */
+    {
+        tll(const char *) font_names = tll_init();
+
+        char *copy = strdup(font_list);
+        for (char *name = strtok(copy, ",");
+             name != NULL;
+             name = strtok(NULL, ","))
+        {
+            while (isspace(*name))
+                name++;
+
+            size_t len = strlen(name);
+            while (len > 0 && isspace(name[len - 1]))
+                name[--len] = '\0';
+
+            tll_push_back(font_names, name);
+        }
+
+        const char *names[tll_length(font_names)];
+        size_t idx = 0;
+
+        tll_foreach(font_names, it)
+            names[idx++] = it->item;
+
+        font = fcft_from_name(tll_length(font_names), names, NULL);
+        assert(font != NULL);
+        fcft_set_emoji_presentation(font, FCFT_EMOJI_PRESENTATION_DEFAULT);
+
+        tll_free(font_names);
+        free(copy);
+    }
 
     image = NULL;
 
